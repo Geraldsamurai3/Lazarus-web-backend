@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lazarus WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 4px solid #667eea;
+            background: white;
+        }
+        .log-entry.incident {
+            border-left-color: #28a745;
+        }
+        .log-entry.location {
+            border-left-color: #ffc107;
+        }
+        .log-entry.notification {
+            border-left-color: #dc3545;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 11px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .incident-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .severity-alta { background: #dc3545; color: white; }
+        .severity-media { background: #ffc107; color: black; }
+        .severity-baja { background: #28a745; color: white; }
+        .severity-critica { background: #6f42c1; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Lazarus WebSocket Testing Dashboard</h1>
+        
+        <div class="grid">
+            <!-- Connection Card -->
+            <div class="card">
+                <h2>🔌 Connection Status</h2>
+                <div id="status" class="status disconnected">Disconnected</div>
+                <input type="number" id="userId" placeholder="User ID" value="1">
+                <div class="btn-group">
+                    <button onclick="connect()">Connect</button>
+                    <button onclick="disconnect()">Disconnect</button>
+                    <button onclick="sendPing()">Ping</button>
+                </div>
+            </div>
+
+            <!-- Location Tracking -->
+            <div class="card">
+                <h2>📍 Location Tracking</h2>
+                <input type="number" id="lat" placeholder="Latitude" value="3.4516">
+                <input type="number" id="lng" placeholder="Longitude" value="-76.5320">
+                <select id="userType" style="width:100%;padding:10px;margin-bottom:10px;">
+                    <option value="CIUDADANO">CIUDADANO</option>
+                    <option value="ENTIDAD">ENTIDAD</option>
+                </select>
+                <div class="btn-group">
+                    <button onclick="sendLocation()">Send Location</button>
+                    <button onclick="startTracking()">Start Auto-Tracking</button>
+                    <button onclick="stopTracking()">Stop Tracking</button>
+                    <button onclick="getEntities()">Get Entities</button>
+                </div>
+            </div>
+
+            <!-- Incidents -->
+            <div class="card">
+                <h2>🚨 Incident Events</h2>
+                <div class="btn-group">
+                    <button onclick="subscribeIncident()">Subscribe Incident #1</button>
+                    <button onclick="unsubscribeIncident()">Unsubscribe</button>
+                    <button onclick="subscribeArea()">Subscribe Area</button>
+                </div>
+            </div>
+
+            <!-- Event Log -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>📊 Event Log</h2>
+                <button onclick="clearLog()" style="float:right;background:#dc3545;">Clear Log</button>
+                <div class="log" id="log"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let trackingInterval = null;
+
+        function log(message, type = 'default') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `
+                <span class="timestamp">${new Date().toLocaleTimeString()}</span><br>
+                ${message}
+            `;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+        }
+
+        function connect() {
+            const userId = document.getElementById('userId').value;
+            
+            socket = io('http://localhost:3000', {
+                query: { userId },
+                transports: ['websocket']
+            });
+
+            socket.on('connect', () => {
+                document.getElementById('status').textContent = `Connected (ID: ${socket.id})`;
+                document.getElementById('status').className = 'status connected';
+                log('✅ Connected to Lazarus WebSocket', 'default');
+            });
+
+            socket.on('disconnect', () => {
+                document.getElementById('status').textContent = 'Disconnected';
+                document.getElementById('status').className = 'status disconnected';
+                log('❌ Disconnected from server', 'default');
+            });
+
+            // Listen for incident events
+            socket.on('incident:created', (data) => {
+                const incident = data.incident;
+                log(`🚨 <strong>NEW INCIDENT #${incident.id}</strong><br>
+                    <span class="incident-badge severity-${incident.severidad.toLowerCase()}">${incident.severidad}</span>
+                    ${incident.tipo}<br>
+                    📍 ${incident.direccion}<br>
+                    👤 ${incident.usuario.nombre}`, 'incident');
+            });
+
+            socket.on('incident:updated', (data) => {
+                log(`🔄 Incident #${data.incidentId} updated<br>
+                    Status: ${data.oldStatus} → <strong>${data.newStatus}</strong>`, 'incident');
+            });
+
+            socket.on('incident:nearby', (data) => {
+                log(`📍 Nearby incident alert!<br>
+                    ${data.incidents.length} incident(s) near you`, 'incident');
+            });
+
+            // Listen for location events
+            socket.on('entity:location', (data) => {
+                log(`🚑 Entity #${data.userId} moving<br>
+                    Lat: ${data.latitude}, Lng: ${data.longitude}`, 'location');
+            });
+
+            // Listen for notifications
+            socket.on('notification', (data) => {
+                log(`🔔 <strong>Notification</strong><br>
+                    ${data.message}`, 'notification');
+            });
+
+            socket.on('notification:broadcast', (data) => {
+                log(`📢 <strong>BROADCAST</strong><br>
+                    ${data.message}`, 'notification');
+            });
+
+            socket.on('alert:emergency', (data) => {
+                log(`🚨🚨 <strong>EMERGENCY ALERT</strong><br>
+                    Type: ${data.type}<br>
+                    ${data.message}`, 'notification');
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        function sendPing() {
+            if (!socket) return alert('Not connected!');
+            
+            log('🏓 Ping sent...', 'default');
+            
+            // Socket.IO acknowledgment callback
+            socket.emit('ping', (response) => {
+                console.log('Pong response received:', response); // Debug
+                
+                if (response) {
+                    const timestamp = response.timestamp ? new Date(response.timestamp).toLocaleTimeString() : 'N/A';
+                    log(`🏓 <strong>Pong received!</strong><br>
+                        Time: ${timestamp}<br>
+                        Message: ${response.message || 'No message'}<br>
+                        Client ID: ${response.clientId || 'Unknown'}`, 'default');
+                } else {
+                    log('🏓 Pong received but empty response', 'default');
+                }
+            });
+        }
+
+        function sendLocation() {
+            if (!socket) return alert('Not connected!');
+            
+            const userId = parseInt(document.getElementById('userId').value);
+            const latitude = parseFloat(document.getElementById('lat').value);
+            const longitude = parseFloat(document.getElementById('lng').value);
+            const userType = document.getElementById('userType').value;
+
+            socket.emit('location:update', {
+                userId,
+                userType,
+                latitude,
+                longitude,
+                timestamp: new Date()
+            });
+
+            log(`📍 Location sent: ${latitude}, ${longitude}`, 'location');
+        }
+
+        function startTracking() {
+            if (!socket) return alert('Not connected!');
+            if (trackingInterval) return alert('Already tracking!');
+
+            trackingInterval = setInterval(() => {
+                // Simulate movement
+                const lat = parseFloat(document.getElementById('lat').value);
+                const lng = parseFloat(document.getElementById('lng').value);
+                
+                document.getElementById('lat').value = (lat + (Math.random() - 0.5) * 0.001).toFixed(6);
+                document.getElementById('lng').value = (lng + (Math.random() - 0.5) * 0.001).toFixed(6);
+                
+                sendLocation();
+            }, 3000);
+
+            log('🎯 Auto-tracking started (every 3 seconds)', 'location');
+        }
+
+        function stopTracking() {
+            if (trackingInterval) {
+                clearInterval(trackingInterval);
+                trackingInterval = null;
+                log('⏹️ Auto-tracking stopped', 'location');
+            }
+        }
+
+        function subscribeIncident() {
+            if (!socket) return alert('Not connected!');
+            socket.emit('incident:subscribe', { incidentId: 1 });
+            log('👁️ Subscribed to incident #1', 'incident');
+        }
+
+        function unsubscribeIncident() {
+            if (!socket) return alert('Not connected!');
+            socket.emit('incident:unsubscribe', { incidentId: 1 });
+            log('👁️‍🗨️ Unsubscribed from incident #1', 'incident');
+        }
+
+        function subscribeArea() {
+            if (!socket) return alert('Not connected!');
+            const lat = parseFloat(document.getElementById('lat').value);
+            const lng = parseFloat(document.getElementById('lng').value);
+            
+            socket.emit('area:subscribe', { latitude: lat, longitude: lng, radius: 5 });
+            log(`🗺️ Subscribed to area (${lat}, ${lng}) radius: 5km`, 'location');
+        }
+
+        function getEntities() {
+            if (!socket) return alert('Not connected!');
+            socket.emit('entities:getLocations', (entities) => {
+                log(`🚑 Active entities: ${entities.length}<br>
+                    ${JSON.stringify(entities, null, 2)}`, 'location');
+            });
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-connect on load
+        window.onload = () => {
+            log('🎉 Lazarus WebSocket Test Dashboard loaded', 'default');
+            log('Click "Connect" to start testing!', 'default');
+        };
+    </script>
+</body>
+</html>

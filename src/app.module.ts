@@ -9,6 +9,7 @@ import { IncidentsModule } from './incidents/incidents.module';
 import { IncidentMediaModule } from './incident-media/incident-media.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { StatisticsModule } from './statistics/statistics.module';
+import { WebsocketsModule } from './websockets/websockets.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { StatisticsModule } from './statistics/statistics.module';
       }),
       inject: [ConfigService],
     }),
+    WebsocketsModule,
     AuthModule, 
     UsersModule, 
     IncidentsModule, 

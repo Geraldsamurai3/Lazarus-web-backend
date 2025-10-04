@@ -4,12 +4,14 @@ import { Repository } from 'typeorm';
 import { Incident, IncidentStatus, IncidentSeverity } from './entity/incident.entity';
 import { CreateIncidentDto, UpdateIncidentDto } from './dto/incident.dto';
 import { UserRole } from '../users/entity/user.entity';
+import { EventsGateway } from '../websockets/events.gateway';
 
 @Injectable()
 export class IncidentsService {
   constructor(
     @InjectRepository(Incident)
     private incidentsRepository: Repository<Incident>,
+    private eventsGateway: EventsGateway,
   ) {}
 
   async create(createIncidentDto: CreateIncidentDto, userId: number): Promise<Incident> {
@@ -18,7 +20,31 @@ export class IncidentsService {
       usuario_id: userId,
     });
 
-    return this.incidentsRepository.save(incident);
+    const savedIncident = await this.incidentsRepository.save(incident);
+    
+    // Load full incident with relations
+    const fullIncident = await this.findOne(savedIncident.id);
+    
+    // Emit WebSocket event for new incident
+    this.eventsGateway.emitIncidentCreated({
+      incident: {
+        id: fullIncident.id,
+        tipo: fullIncident.tipo,
+        descripcion: fullIncident.descripcion,
+        severidad: fullIncident.severidad,
+        latitud: fullIncident.latitud,
+        longitud: fullIncident.longitud,
+        direccion: fullIncident.direccion,
+        estado: fullIncident.estado,
+        fecha_creacion: fullIncident.fecha_creacion,
+        usuario: {
+          id: fullIncident.usuario.id,
+          nombre: fullIncident.usuario.nombre,
+        },
+      },
+    });
+
+    return fullIncident;
   }
 
   async findAll(filters?: {
@@ -72,6 +98,7 @@ export class IncidentsService {
     userRole: UserRole,
   ): Promise<Incident> {
     const incident = await this.findOne(id);
+    const oldStatus = incident.estado;
 
     // Only allow owner to edit basic fields, admins and entities can change status
     if (incident.usuario_id !== userId && userRole === UserRole.CIUDADANO) {
@@ -84,7 +111,19 @@ export class IncidentsService {
     }
 
     await this.incidentsRepository.update(id, updateIncidentDto);
-    return this.findOne(id);
+    const updatedIncident = await this.findOne(id);
+
+    // Emit WebSocket event if status changed
+    if (updateIncidentDto.estado && updateIncidentDto.estado !== oldStatus) {
+      this.eventsGateway.emitIncidentUpdated({
+        incidentId: id,
+        oldStatus: oldStatus,
+        newStatus: updateIncidentDto.estado,
+        updatedBy: userId,
+      });
+    }
+
+    return updatedIncident;
   }
 
   async remove(id: number, userId: number, userRole: UserRole): Promise<void> {
