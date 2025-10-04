@@ -58,9 +58,13 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
+    // Check if this is the first user - if so, make them ADMIN
+    const userCount = await this.usersService.getUserCount();
+    const userRole = userCount === 0 ? UserRole.ADMIN : UserRole.CIUDADANO;
+
     const user = await this.usersService.create({
       ...registerDto,
-      rol: UserRole.CIUDADANO, // Default role for registration
+      rol: userRole,
     });
 
     // Automatically log in after registration
@@ -79,6 +83,7 @@ export class AuthService {
         rol: user.rol,
         estado: user.estado,
       },
+      message: userRole === UserRole.ADMIN ? 'Bienvenido! Eres el primer usuario y ahora eres ADMIN.' : 'Registro exitoso como CIUDADANO.',
     };
   }
 }

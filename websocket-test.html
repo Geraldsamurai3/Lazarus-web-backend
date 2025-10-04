@@ -205,7 +205,7 @@
         function connect() {
             const userId = document.getElementById('userId').value;
             
-            socket = io('http://localhost:3000', {
+            socket = io('http://localhost:3001', {
                 query: { userId },
                 transports: ['websocket']
             });

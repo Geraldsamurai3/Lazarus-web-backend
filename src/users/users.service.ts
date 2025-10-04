@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -88,5 +88,29 @@ export class UsersService {
 
   async validatePassword(plainTextPassword: string, hashedPassword: string): Promise<boolean> {
     return bcrypt.compare(plainTextPassword, hashedPassword);
+  }
+
+  async getUserCount(): Promise<number> {
+    return this.usersRepository.count();
+  }
+
+  async changeUserRole(userId: number, newRole: UserRole, adminUserId: number): Promise<User> {
+    // Verify that the admin user exists and is actually an admin
+    const adminUser = await this.findOne(adminUserId);
+    if (adminUser.rol !== UserRole.ADMIN) {
+      throw new ConflictException('Solo los administradores pueden cambiar roles de usuarios');
+    }
+
+    // Verify target user exists
+    const targetUser = await this.findOne(userId);
+    
+    // Prevent admin from changing their own role (security measure)
+    if (userId === adminUserId) {
+      throw new ConflictException('Los administradores no pueden cambiar su propio rol');
+    }
+
+    // Update the user role
+    await this.usersRepository.update(userId, { rol: newRole });
+    return this.findOne(userId);
   }
 }

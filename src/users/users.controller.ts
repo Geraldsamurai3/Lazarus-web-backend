@@ -12,8 +12,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
-import { User } from './entity/user.entity';
+import { CreateUserDto, UpdateUserDto, ChangeUserRoleDto } from './dto/user.dto';
+import { User, UserRole } from './entity/user.entity';
 
 @Controller('users')
 export class UsersController {
@@ -60,6 +60,16 @@ export class UsersController {
   @Patch(':id/strike')
   async incrementStrikes(@Param('id', ParseIntPipe) id: number): Promise<Omit<User, 'contraseña'>> {
     const user = await this.usersService.incrementStrikes(id);
+    const { contraseña, ...result } = user;
+    return result;
+  }
+
+  @Patch(':id/role')
+  async changeUserRole(
+    @Param('id', ParseIntPipe) id: number,
+    @Body(ValidationPipe) changeRoleDto: ChangeUserRoleDto,
+  ): Promise<Omit<User, 'contraseña'>> {
+    const user = await this.usersService.changeUserRole(id, changeRoleDto.rol, changeRoleDto.adminUserId);
     const { contraseña, ...result } = user;
     return result;
   }

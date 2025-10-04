@@ -19,7 +19,7 @@ import type {
 
 @WebSocketGateway({
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:3001'], // Add your frontend URLs
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://10.24.23.119:3000'], // Frontend URLs
     credentials: true,
   },
 })
