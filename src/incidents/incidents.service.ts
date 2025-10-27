@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Incident, IncidentStatus, IncidentSeverity } from './entity/incident.entity';
 import { CreateIncidentDto, UpdateIncidentDto } from './dto/incident.dto';
-import { UserRole } from '../users/entity/user.entity';
 import { EventsGateway } from '../websockets/events.gateway';
+import { UserType } from '../common/enums/user-type.enum';
 
 @Injectable()
 export class IncidentsService {
@@ -14,10 +14,10 @@ export class IncidentsService {
     private eventsGateway: EventsGateway,
   ) {}
 
-  async create(createIncidentDto: CreateIncidentDto, userId: number): Promise<Incident> {
+  async create(createIncidentDto: CreateIncidentDto, ciudadanoId: number): Promise<Incident> {
     const incident = this.incidentsRepository.create({
       ...createIncidentDto,
-      usuario_id: userId,
+      ciudadano_id: ciudadanoId,
     });
 
     const savedIncident = await this.incidentsRepository.save(incident);
@@ -38,8 +38,8 @@ export class IncidentsService {
         estado: fullIncident.estado,
         fecha_creacion: fullIncident.fecha_creacion,
         usuario: {
-          id: fullIncident.usuario.id,
-          nombre: fullIncident.usuario.nombre,
+          id: fullIncident.ciudadano.id_ciudadano,
+          nombre: `${fullIncident.ciudadano.nombre} ${fullIncident.ciudadano.apellidos}`,
         },
       },
     });
@@ -51,11 +51,11 @@ export class IncidentsService {
     tipo?: string;
     severidad?: string;
     estado?: string;
-    userId?: number;
+    ciudadanoId?: number;
   }): Promise<Incident[]> {
     const queryBuilder = this.incidentsRepository
       .createQueryBuilder('incident')
-      .leftJoinAndSelect('incident.usuario', 'user');
+      .leftJoinAndSelect('incident.ciudadano', 'ciudadano');
 
     if (filters?.tipo) {
       queryBuilder.andWhere('incident.tipo = :tipo', { tipo: filters.tipo });
@@ -69,8 +69,8 @@ export class IncidentsService {
       queryBuilder.andWhere('incident.estado = :estado', { estado: filters.estado });
     }
 
-    if (filters?.userId) {
-      queryBuilder.andWhere('incident.usuario_id = :userId', { userId: filters.userId });
+    if (filters?.ciudadanoId) {
+      queryBuilder.andWhere('incident.ciudadano_id = :ciudadanoId', { ciudadanoId: filters.ciudadanoId });
     }
 
     return queryBuilder
@@ -81,7 +81,7 @@ export class IncidentsService {
   async findOne(id: number): Promise<Incident> {
     const incident = await this.incidentsRepository.findOne({
       where: { id },
-      relations: ['usuario'],
+      relations: ['ciudadano'],
     });
 
     if (!incident) {
@@ -95,20 +95,32 @@ export class IncidentsService {
     id: number,
     updateIncidentDto: UpdateIncidentDto,
     userId: number,
-    userRole: UserRole,
+    userType: UserType,
   ): Promise<Incident> {
     const incident = await this.findOne(id);
     const oldStatus = incident.estado;
 
-    // Only allow owner to edit basic fields, admins and entities can change status
-    if (incident.usuario_id !== userId && userRole === UserRole.CIUDADANO) {
-      throw new ForbiddenException('No tienes permisos para editar este incidente');
+    // CIUDADANO: Solo puede editar sus propios incidentes y solo descripción/severidad
+    if (userType === UserType.CIUDADANO) {
+      if (incident.ciudadano_id !== userId) {
+        throw new ForbiddenException('No puedes editar incidentes de otros usuarios');
+      }
+      if (updateIncidentDto.estado) {
+        throw new ForbiddenException('Los ciudadanos no pueden cambiar el estado del incidente');
+      }
     }
 
-    // Citizens can't change status, only admins and entities
-    if (updateIncidentDto.estado && userRole === UserRole.CIUDADANO) {
-      throw new ForbiddenException('No tienes permisos para cambiar el estado del incidente');
+    // ENTIDAD: Puede cambiar el estado de cualquier incidente para gestionarlo
+    // No puede cambiar otros campos que no sean el estado
+    if (userType === UserType.ENTIDAD) {
+      // Las entidades pueden cambiar el estado de cualquier incidente
+      if (Object.keys(updateIncidentDto).length > 1 || 
+          (Object.keys(updateIncidentDto).length === 1 && !updateIncidentDto.estado)) {
+        throw new ForbiddenException('Las entidades solo pueden cambiar el estado del incidente');
+      }
     }
+
+    // ADMIN: Puede editar cualquier campo de cualquier incidente
 
     await this.incidentsRepository.update(id, updateIncidentDto);
     const updatedIncident = await this.findOne(id);
@@ -126,11 +138,11 @@ export class IncidentsService {
     return updatedIncident;
   }
 
-  async remove(id: number, userId: number, userRole: UserRole): Promise<void> {
+  async remove(id: number, userId: number, userType: UserType): Promise<void> {
     const incident = await this.findOne(id);
 
     // Only allow owner or admin to delete
-    if (incident.usuario_id !== userId && userRole !== UserRole.ADMIN) {
+    if (incident.ciudadano_id !== userId && userType !== UserType.ADMIN) {
       throw new ForbiddenException('No tienes permisos para eliminar este incidente');
     }
 
@@ -141,7 +153,7 @@ export class IncidentsService {
     // Simple distance calculation (you might want to use a more sophisticated geo query)
     return this.incidentsRepository
       .createQueryBuilder('incident')
-      .leftJoinAndSelect('incident.usuario', 'user')
+      .leftJoinAndSelect('incident.ciudadano', 'ciudadano')
       .where(
         `(6371 * acos(cos(radians(:lat)) * cos(radians(incident.latitud)) * 
         cos(radians(incident.longitud) - radians(:lng)) + sin(radians(:lat)) * 
@@ -189,3 +201,5 @@ export class IncidentsService {
     };
   }
 }
+
+

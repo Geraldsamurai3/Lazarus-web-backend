@@ -10,67 +10,89 @@ import {
   ValidationPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto, ChangeUserRoleDto } from './dto/user.dto';
-import { User, UserRole } from './entity/user.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { GetUser } from '../auth/decorators/get-user.decorator';
+import { UserType } from '../common/enums/user-type.enum';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async create(@Body(ValidationPipe) createUserDto: CreateUserDto): Promise<Omit<User, 'contraseña'>> {
-    const user = await this.usersService.create(createUserDto);
-    // Don't return password in response
-    const { contraseña, ...result } = user;
-    return result;
-  }
-
+  // ADMIN y ENTIDAD: Ver todos los usuarios
   @Get()
-  async findAll(): Promise<Omit<User, 'contraseña'>[]> {
+  @Roles(UserType.ADMIN, UserType.ENTIDAD)
+  async findAll() {
     const users = await this.usersService.findAll();
-    return users.map(({ contraseña, ...user }) => user);
+    // Remover contraseñas de la respuesta
+    return users.map(user => {
+      const { contraseña, ...userData } = user;
+      return userData;
+    });
   }
 
-  @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Omit<User, 'contraseña'>> {
-    const user = await this.usersService.findOne(id);
-    const { contraseña, ...result } = user;
-    return result;
-  }
-
-  @Patch(':id')
-  async update(
+  // TODOS: Ver perfil de usuario específico por ID y tipo
+  @Get(':userType/:id')
+  @Roles(UserType.CIUDADANO, UserType.ENTIDAD, UserType.ADMIN)
+  async findOne(
+    @Param('userType') userType: UserType,
     @Param('id', ParseIntPipe) id: number,
-    @Body(ValidationPipe) updateUserDto: UpdateUserDto,
-  ): Promise<Omit<User, 'contraseña'>> {
-    const user = await this.usersService.update(id, updateUserDto);
+    @GetUser('userId') currentUserId: number,
+    @GetUser('userType') currentUserType: UserType,
+  ) {
+    // Ciudadanos solo pueden ver su propio perfil
+    if (currentUserType === UserType.CIUDADANO && (id !== currentUserId || userType !== UserType.CIUDADANO)) {
+      throw new ForbiddenException('No puedes ver el perfil de otros usuarios');
+    }
+
+    const user = await this.usersService.findById(id, userType);
+    if (!user) {
+      throw new ForbiddenException('Usuario no encontrado');
+    }
+
     const { contraseña, ...result } = user;
     return result;
   }
 
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    return this.usersService.remove(id);
-  }
+  // TODOS: Ver mi propio perfil
+  @Get('me')
+  @Roles(UserType.CIUDADANO, UserType.ENTIDAD, UserType.ADMIN)
+  async getMyProfile(
+    @GetUser('userId') userId: number,
+    @GetUser('userType') userType: UserType,
+  ) {
+    const user = await this.usersService.findById(userId, userType);
+    if (!user) {
+      throw new ForbiddenException('Usuario no encontrado');
+    }
 
-  @Patch(':id/strike')
-  async incrementStrikes(@Param('id', ParseIntPipe) id: number): Promise<Omit<User, 'contraseña'>> {
-    const user = await this.usersService.incrementStrikes(id);
     const { contraseña, ...result } = user;
     return result;
   }
 
-  @Patch(':id/role')
-  async changeUserRole(
+  // ADMIN: Habilitar/deshabilitar usuarios
+  @Patch(':userType/:id/toggle-status')
+  @Roles(UserType.ADMIN)
+  async toggleUserStatus(
+    @Param('userType') userType: UserType,
     @Param('id', ParseIntPipe) id: number,
-    @Body(ValidationPipe) changeRoleDto: ChangeUserRoleDto,
-  ): Promise<Omit<User, 'contraseña'>> {
-    const user = await this.usersService.changeUserRole(id, changeRoleDto.rol, changeRoleDto.adminUserId);
-    const { contraseña, ...result } = user;
+  ) {
+    await this.usersService.toggleUserStatus(id, userType);
+    return { message: 'Estado del usuario actualizado' };
+  }
+
+  // ADMIN y ENTIDAD: Incrementar strikes a ciudadanos
+  @Patch('ciudadano/:id/strike')
+  @Roles(UserType.ADMIN, UserType.ENTIDAD)
+  async incrementStrikes(@Param('id', ParseIntPipe) id: number) {
+    const ciudadano = await this.usersService.incrementStrikes(id);
+    const { contraseña, ...result } = ciudadano;
     return result;
   }
 }

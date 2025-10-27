@@ -1,89 +1,33 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../users/users.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
-import { UserStatus, UserRole } from '../users/entity/user.entity';
+import { Injectable } from '@nestjs/common';
+import { UnifiedAuthService } from '../users/services/unified-auth.service';
+import { LoginDto, RegisterCiudadanoDto, RegisterEntidadDto, RegisterAdminDto } from '../users/dto/user-roles.dto';
 
+/**
+ * AuthService ahora delega toda la lógica a UnifiedAuthService
+ */
 @Injectable()
 export class AuthService {
   constructor(
-    private usersService: UsersService,
-    private jwtService: JwtService,
+    private unifiedAuthService: UnifiedAuthService,
   ) {}
 
   async validateUser(email: string, contraseña: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
-    
-    if (!user) {
-      return null;
-    }
-
-    if (user.estado === UserStatus.DESHABILITADO) {
-      throw new UnauthorizedException('Cuenta deshabilitada');
-    }
-
-    const isPasswordValid = await this.usersService.validatePassword(contraseña, user.contraseña);
-    
-    if (user && isPasswordValid) {
-      const { contraseña: _, ...result } = user;
-      return result;
-    }
-    
-    return null;
+    return this.unifiedAuthService.validateUser(email, contraseña);
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.contraseña);
-    
-    if (!user) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-
-    const payload = { 
-      email: user.email, 
-      sub: user.id, 
-      rol: user.rol 
-    };
-
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol,
-        estado: user.estado,
-      },
-    };
+    return this.unifiedAuthService.login(loginDto);
   }
 
-  async register(registerDto: RegisterDto) {
-    // Check if this is the first user - if so, make them ADMIN
-    const userCount = await this.usersService.getUserCount();
-    const userRole = userCount === 0 ? UserRole.ADMIN : UserRole.CIUDADANO;
+  async register(registerDto: RegisterCiudadanoDto) {
+    return this.unifiedAuthService.registerCiudadano(registerDto);
+  }
 
-    const user = await this.usersService.create({
-      ...registerDto,
-      rol: userRole,
-    });
+  async registerEntidad(registerDto: RegisterEntidadDto) {
+    return this.unifiedAuthService.registerEntidad(registerDto);
+  }
 
-    // Automatically log in after registration
-    const payload = { 
-      email: user.email, 
-      sub: user.id, 
-      rol: user.rol 
-    };
-
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol,
-        estado: user.estado,
-      },
-      message: userRole === UserRole.ADMIN ? 'Bienvenido! Eres el primer usuario y ahora eres ADMIN.' : 'Registro exitoso como CIUDADANO.',
-    };
+  async registerAdmin(registerDto: RegisterAdminDto) {
+    return this.unifiedAuthService.registerAdmin(registerDto);
   }
 }

@@ -12,49 +12,60 @@ import {
   HttpCode,
   HttpStatus,
   ParseFloatPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { IncidentsService } from './incidents.service';
 import { CreateIncidentDto, UpdateIncidentDto } from './dto/incident.dto';
 import { Incident } from './entity/incident.entity';
-import { UserRole } from '../users/entity/user.entity';
-
-// TODO: Implement authentication decorators when auth is ready
-// For now, we'll simulate user context with query parameters
+import { UserType } from '../common/enums/user-type.enum';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { GetUser } from '../auth/decorators/get-user.decorator';
 
 @Controller('incidents')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class IncidentsController {
   constructor(private readonly incidentsService: IncidentsService) {}
 
+  // CIUDADANO: Crear incidentes
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @Roles(UserType.CIUDADANO, UserType.ADMIN)
   async create(
     @Body(ValidationPipe) createIncidentDto: CreateIncidentDto,
-    @Query('userId', ParseIntPipe) userId: number, // TODO: Get from JWT token
+    @GetUser('userId') userId: number,
   ): Promise<Incident> {
     return this.incidentsService.create(createIncidentDto, userId);
   }
 
+  // TODOS: Ver todos los incidentes (con filtros)
   @Get()
+  @Roles(UserType.CIUDADANO, UserType.ENTIDAD, UserType.ADMIN)
   async findAll(
     @Query('tipo') tipo?: string,
     @Query('severidad') severidad?: string,
     @Query('estado') estado?: string,
-    @Query('userId') userId?: number,
+    @Query('ciudadanoId') ciudadanoId?: number,
   ): Promise<Incident[]> {
     return this.incidentsService.findAll({
       tipo,
       severidad,
       estado,
-      userId,
+      ciudadanoId,
     });
   }
 
+  // ENTIDAD y ADMIN: Ver estadísticas
   @Get('statistics')
+  @Roles(UserType.ENTIDAD, UserType.ADMIN)
   async getStatistics() {
     return this.incidentsService.getStatistics();
   }
 
+  // TODOS: Ver incidentes cercanos (importante para ciudadanos)
   @Get('nearby')
+  @Roles(UserType.CIUDADANO, UserType.ENTIDAD, UserType.ADMIN)
   async getNearbyIncidents(
     @Query('lat', ParseFloatPipe) lat: number,
     @Query('lng', ParseFloatPipe) lng: number,
@@ -63,28 +74,38 @@ export class IncidentsController {
     return this.incidentsService.getIncidentsByLocation(lat, lng, radius);
   }
 
+  // TODOS: Ver detalle de un incidente
   @Get(':id')
+  @Roles(UserType.CIUDADANO, UserType.ENTIDAD, UserType.ADMIN)
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<Incident> {
     return this.incidentsService.findOne(id);
   }
 
+  // CIUDADANO: Editar sus propios incidentes
+  // ENTIDAD: Cambiar estado de cualquier incidente
+  // ADMIN: Editar cualquier incidente
   @Patch(':id')
+  @Roles(UserType.CIUDADANO, UserType.ENTIDAD, UserType.ADMIN)
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body(ValidationPipe) updateIncidentDto: UpdateIncidentDto,
-    @Query('userId', ParseIntPipe) userId: number, // TODO: Get from JWT token
-    @Query('userRole') userRole: UserRole = UserRole.CIUDADANO, // TODO: Get from JWT token
+    @GetUser('userId') userId: number,
+    @GetUser('userType') userType: UserType,
   ): Promise<Incident> {
-    return this.incidentsService.update(id, updateIncidentDto, userId, userRole);
+    return this.incidentsService.update(id, updateIncidentDto, userId, userType);
   }
 
+  // CIUDADANO: Eliminar sus propios incidentes
+  // ADMIN: Eliminar cualquier incidente
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(UserType.CIUDADANO, UserType.ADMIN)
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Query('userId', ParseIntPipe) userId: number, // TODO: Get from JWT token
-    @Query('userRole') userRole: UserRole = UserRole.CIUDADANO, // TODO: Get from JWT token
+    @GetUser('userId') userId: number,
+    @GetUser('userType') userType: UserType,
   ): Promise<void> {
-    return this.incidentsService.remove(id, userId, userRole);
+    return this.incidentsService.remove(id, userId, userType);
   }
 }
+
