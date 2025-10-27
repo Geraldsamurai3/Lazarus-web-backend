@@ -1,30 +1,33 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { User } from '../../users/entity/user.entity';
-import { Incident } from '../../incidents/entity/incident.entity';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { UserType } from '../../common/enums/user-type.enum';
 
 export enum NotificationStatus {
   ENVIADA = 'ENVIADA',
   LEIDA = 'LEIDA',
 }
 
-@Entity('notifications')
+/**
+ * Notificaciones con relación polimórfica a usuarios
+ * Puede referenciar a Ciudadano, EntidadPublica o Administrador
+ */
+@Entity('notificaciones')
 export class Notification {
   @PrimaryGeneratedColumn()
   id: number;
 
+  // Relación polimórfica: tipo de usuario + ID
+  @Column({
+    type: 'enum',
+    enum: UserType,
+  })
+  usuario_tipo: UserType;
+
   @Column()
   usuario_id: number;
 
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'usuario_id' })
-  usuario: User;
-
+  // Referencia opcional a incidente
   @Column({ nullable: true })
   incidente_id: number;
-
-  @ManyToOne(() => Incident)
-  @JoinColumn({ name: 'incidente_id' })
-  incidente: Incident;
 
   @Column('text')
   mensaje: string;

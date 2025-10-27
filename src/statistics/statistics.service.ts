@@ -2,16 +2,23 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Incident } from '../incidents/entity/incident.entity';
-import { User } from '../users/entity/user.entity';
+import { Ciudadano } from '../users/entity/ciudadano.entity';
+import { EntidadPublica } from '../users/entity/entidad-publica.entity';
+import { Administrador } from '../users/entity/administrador.entity';
 import { Notification, NotificationStatus } from '../notifications/entity/notification.entity';
+import { UserType } from '../common/enums/user-type.enum';
 
 @Injectable()
 export class StatisticsService {
   constructor(
     @InjectRepository(Incident)
     private incidentsRepository: Repository<Incident>,
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    @InjectRepository(Ciudadano)
+    private ciudadanosRepository: Repository<Ciudadano>,
+    @InjectRepository(EntidadPublica)
+    private entidadesRepository: Repository<EntidadPublica>,
+    @InjectRepository(Administrador)
+    private adminsRepository: Repository<Administrador>,
     @InjectRepository(Notification)
     private notificationsRepository: Repository<Notification>,
   ) {}
@@ -19,34 +26,43 @@ export class StatisticsService {
   async getDashboardStats() {
     const [
       totalIncidents,
-      totalUsers,
+      totalCiudadanos,
+      totalEntidades,
+      totalAdmins,
       totalNotifications,
       incidentsByStatus,
       incidentsBySeverity,
       incidentsByType,
-      usersByRole,
+      usersByType,
       recentIncidents,
     ] = await Promise.all([
       this.incidentsRepository.count(),
-      this.usersRepository.count(),
+      this.ciudadanosRepository.count(),
+      this.entidadesRepository.count(),
+      this.adminsRepository.count(),
       this.notificationsRepository.count(),
       this.getIncidentsByStatus(),
       this.getIncidentsBySeverity(),
       this.getIncidentsByType(),
-      this.getUsersByRole(),
+      this.getUsersByType(),
       this.getRecentIncidents(5),
     ]);
+
+    const totalUsers = totalCiudadanos + totalEntidades + totalAdmins;
 
     return {
       totals: {
         incidents: totalIncidents,
         users: totalUsers,
+        ciudadanos: totalCiudadanos,
+        entidades: totalEntidades,
+        admins: totalAdmins,
         notifications: totalNotifications,
       },
       incidentsByStatus,
       incidentsBySeverity,
       incidentsByType,
-      usersByRole,
+      usersByType,
       recentIncidents,
     };
   }
@@ -93,23 +109,21 @@ export class StatisticsService {
     }, {});
   }
 
-  async getUsersByRole() {
-    const results = await this.usersRepository
-      .createQueryBuilder('user')
-      .select('user.rol', 'role')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('user.rol')
-      .getRawMany();
+  async getUsersByType() {
+    const ciudadanosCount = await this.ciudadanosRepository.count();
+    const entidadesCount = await this.entidadesRepository.count();
+    const adminsCount = await this.adminsRepository.count();
 
-    return results.reduce((acc, item) => {
-      acc[item.role] = parseInt(item.count);
-      return acc;
-    }, {});
+    return {
+      [UserType.CIUDADANO]: ciudadanosCount,
+      [UserType.ENTIDAD]: entidadesCount,
+      [UserType.ADMIN]: adminsCount,
+    };
   }
 
   async getRecentIncidents(limit: number = 10): Promise<Incident[]> {
     return this.incidentsRepository.find({
-      relations: ['usuario'],
+      relations: ['ciudadano'],
       order: { fecha_creacion: 'DESC' },
       take: limit,
     });
@@ -152,18 +166,37 @@ export class StatisticsService {
     }));
   }
 
-  async getUserActivityStats(userId: number) {
+  async getUserActivityStats(userId: number, userType: UserType) {
+    // Solo ciudadanos crean incidentes
+    if (userType !== UserType.CIUDADANO) {
+      return {
+        totalIncidents: 0,
+        incidentsByStatus: {},
+        notifications: {
+          total: 0,
+          read: 0,
+          unread: 0,
+        },
+      };
+    }
+
     const [
       totalIncidents,
       incidentsByStatus,
       notificationsSent,
       notificationsRead,
     ] = await Promise.all([
-      this.incidentsRepository.count({ where: { usuario_id: userId } }),
+      this.incidentsRepository.count({ where: { ciudadano_id: userId } }),
       this.getUserIncidentsByStatus(userId),
-      this.notificationsRepository.count({ where: { usuario_id: userId } }),
       this.notificationsRepository.count({ 
-        where: { usuario_id: userId, estado: NotificationStatus.LEIDA } 
+        where: { usuario_id: userId, usuario_tipo: userType } 
+      }),
+      this.notificationsRepository.count({ 
+        where: { 
+          usuario_id: userId, 
+          usuario_tipo: userType,
+          estado: NotificationStatus.LEIDA 
+        } 
       }),
     ]);
 
@@ -178,12 +211,12 @@ export class StatisticsService {
     };
   }
 
-  private async getUserIncidentsByStatus(userId: number) {
+  private async getUserIncidentsByStatus(ciudadanoId: number) {
     const results = await this.incidentsRepository
       .createQueryBuilder('incident')
       .select('incident.estado', 'status')
       .addSelect('COUNT(*)', 'count')
-      .where('incident.usuario_id = :userId', { userId })
+      .where('incident.ciudadano_id = :ciudadanoId', { ciudadanoId })
       .groupBy('incident.estado')
       .getRawMany();
 

@@ -1,11 +1,12 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { User } from '../../users/entity/user.entity';
+import { Ciudadano } from '../../users/entity/ciudadano.entity';
 
 export enum IncidentType {
-  MEDICA = 'MEDICA',
-  INFRAESTRUCTURA = 'INFRAESTRUCTURA',
-  SEGURIDAD = 'SEGURIDAD',
-  AMBIENTE = 'AMBIENTE',
+  INCENDIO = 'INCENDIO',
+  ACCIDENTE = 'ACCIDENTE',
+  INUNDACION = 'INUNDACION',
+  DESLIZAMIENTO = 'DESLIZAMIENTO',
+  TERREMOTO = 'TERREMOTO',
   OTRO = 'OTRO',
 }
 
@@ -17,23 +18,23 @@ export enum IncidentSeverity {
 }
 
 export enum IncidentStatus {
-  NUEVO = 'NUEVO',
-  REVISION = 'REVISION',
-  ATENDIDO = 'ATENDIDO',
-  FALSO = 'FALSO',
+  PENDIENTE = 'PENDIENTE',
+  EN_PROCESO = 'EN_PROCESO',
+  RESUELTO = 'RESUELTO',
+  CANCELADO = 'CANCELADO',
 }
 
-@Entity('incidents')
+@Entity('incidentes')
 export class Incident {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
-  usuario_id: number;
+  ciudadano_id: number;
 
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'usuario_id' })
-  usuario: User;
+  @ManyToOne(() => Ciudadano, ciudadano => ciudadano.incidentes)
+  @JoinColumn({ name: 'ciudadano_id' })
+  ciudadano: Ciudadano;
 
   @Column({
     type: 'enum',
@@ -62,9 +63,12 @@ export class Incident {
   @Column({
     type: 'enum',
     enum: IncidentStatus,
-    default: IncidentStatus.NUEVO,
+    default: IncidentStatus.PENDIENTE,
   })
   estado: IncidentStatus;
+
+  @Column('simple-array', { nullable: true })
+  imagenes: string[];
 
   @CreateDateColumn()
   fecha_creacion: Date;

@@ -1,92 +1,111 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
-import { User, UserRole, UserStatus } from './entity/user.entity';
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { UnifiedAuthService } from './services/unified-auth.service';
+import { UserType } from '../common/enums/user-type.enum';
+import { Ciudadano } from './entity/ciudadano.entity';
+import { EntidadPublica } from './entity/entidad-publica.entity';
+import { Administrador } from './entity/administrador.entity';
 
+/**
+ * UsersService ahora actúa como facade/proxy para UnifiedAuthService
+ * Mantiene compatibilidad con código existente mientras usa las 3 nuevas entidades
+ */
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    private unifiedAuthService: UnifiedAuthService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    // Check if user already exists
-    const existingUser = await this.usersRepository.findOne({
-      where: { email: createUserDto.email },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('El email ya está registrado');
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(createUserDto.contraseña, 10);
-
-    const user = this.usersRepository.create({
-      ...createUserDto,
-      contraseña: hashedPassword,
-    });
-
-    return this.usersRepository.save(user);
+  /**
+   * Buscar usuario por email en todas las tablas
+   */
+  async findByEmail(email: string): Promise<{ user: any; userType: UserType } | null> {
+    return this.unifiedAuthService.findByEmail(email);
   }
 
-  async findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+  /**
+   * Buscar usuario por ID y tipo específico
+   */
+  async findById(id: number, userType: UserType): Promise<any> {
+    return this.unifiedAuthService.findById(id, userType);
   }
 
-  async findOne(id: number): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user) {
-      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
-    }
-    return user;
+  /**
+   * Obtener ciudadano por ID
+   */
+  async findCiudadanoById(id: number): Promise<Ciudadano | null> {
+    return this.unifiedAuthService.findCiudadanoById(id);
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { email } });
+  /**
+   * Obtener entidad por ID
+   */
+  async findEntidadById(id: number): Promise<EntidadPublica | null> {
+    return this.unifiedAuthService.findEntidadById(id);
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
-
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.usersRepository.findOne({
-        where: { email: updateUserDto.email },
-      });
-      if (existingUser) {
-        throw new ConflictException('El email ya está en uso');
-      }
-    }
-
-    if (updateUserDto.contraseña) {
-      updateUserDto.contraseña = await bcrypt.hash(updateUserDto.contraseña, 10);
-    }
-
-    await this.usersRepository.update(id, updateUserDto);
-    return this.findOne(id);
+  /**
+   * Obtener administrador por ID
+   */
+  async findAdminById(id: number): Promise<Administrador | null> {
+    return this.unifiedAuthService.findAdminById(id);
   }
 
-  async remove(id: number): Promise<void> {
-    const user = await this.findOne(id);
-    await this.usersRepository.remove(user);
+  /**
+   * Obtener todos los ciudadanos
+   */
+  async getAllCiudadanos(): Promise<Ciudadano[]> {
+    return this.unifiedAuthService.getAllCiudadanos();
   }
 
-  async incrementStrikes(id: number): Promise<User> {
-    const user = await this.findOne(id);
-    user.strikes += 1;
-    
-    // Auto-disable user after 3 strikes
-    if (user.strikes >= 3) {
-      user.estado = UserStatus.DESHABILITADO;
-    }
-
-    return this.usersRepository.save(user);
+  /**
+   * Obtener todas las entidades públicas
+   */
+  async getAllEntidades(): Promise<EntidadPublica[]> {
+    return this.unifiedAuthService.getAllEntidades();
   }
 
-  async validatePassword(plainTextPassword: string, hashedPassword: string): Promise<boolean> {
-    return bcrypt.compare(plainTextPassword, hashedPassword);
+  /**
+   * Obtener todos los administradores
+   */
+  async getAllAdmins(): Promise<Administrador[]> {
+    return this.unifiedAuthService.getAllAdmins();
+  }
+
+  /**
+   * Obtener todos los usuarios de todas las tablas
+   */
+  async findAll(): Promise<Array<any>> {
+    const [ciudadanos, entidades, admins] = await Promise.all([
+      this.getAllCiudadanos(),
+      this.getAllEntidades(),
+      this.getAllAdmins(),
+    ]);
+
+    return [
+      ...ciudadanos.map(c => ({ ...c, userType: UserType.CIUDADANO })),
+      ...entidades.map(e => ({ ...e, userType: UserType.ENTIDAD })),
+      ...admins.map(a => ({ ...a, userType: UserType.ADMIN })),
+    ];
+  }
+
+  /**
+   * Incrementar strikes de un ciudadano
+   */
+  async incrementStrikes(ciudadanoId: number): Promise<Ciudadano> {
+    return this.unifiedAuthService.incrementStrikes(ciudadanoId);
+  }
+
+  /**
+   * Habilitar/Deshabilitar usuario
+   */
+  async toggleUserStatus(id: number, userType: UserType): Promise<void> {
+    return this.unifiedAuthService.toggleUserStatus(id, userType);
+  }
+
+  /**
+   * Validar credenciales de usuario
+   */
+  async validateUser(email: string, contraseña: string): Promise<any> {
+    return this.unifiedAuthService.validateUser(email, contraseña);
   }
 }
