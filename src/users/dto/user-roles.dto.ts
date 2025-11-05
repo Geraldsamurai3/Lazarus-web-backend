@@ -188,3 +188,90 @@ export class UpdateAdminDto {
   @IsOptional()
   activo?: boolean;
 }
+
+export class ForgotPasswordDto {
+  @IsNotEmpty()
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsNotEmpty()
+  @IsString()
+  token: string;
+
+  @IsNotEmpty()
+  @MinLength(8)
+  newPassword: string;
+}
+
+export class CheckEmailDto {
+  @IsNotEmpty()
+  @IsEmail()
+  email: string;
+}
+
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  apellidos?: string;
+
+  @IsOptional()
+  @IsString()
+  telefono?: string;
+
+  @IsOptional()
+  @IsString()
+  telefono_emergencia?: string;
+
+  @IsOptional()
+  @IsString()
+  provincia?: string;
+
+  @IsOptional()
+  @IsString()
+  canton?: string;
+
+  @IsOptional()
+  @IsString()
+  distrito?: string;
+
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @IsOptional()
+  @IsString()
+  ubicacion?: string;
+
+  @IsOptional()
+  @IsString()
+  nombre_entidad?: string;
+}
+
+export class GetProfileResponseDto {
+  id: number;
+  nombre?: string;
+  apellidos?: string;
+  nombre_entidad?: string;
+  email: string;
+  cedula?: string;
+  telefono?: string;
+  telefono_emergencia?: string;
+  provincia: string;
+  canton: string;
+  distrito: string;
+  direccion?: string;
+  ubicacion?: string;
+  tipo_entidad?: TipoEntidad;
+  nivel_acceso?: NivelAcceso;
+  userType: 'ciudadano' | 'entidad_publica' | 'administrador';
+  activo: boolean;
+  strikes?: number;
+  fecha_creacion: Date;
+  fecha_actualizacion: Date;
+}

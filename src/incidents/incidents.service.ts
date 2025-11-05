@@ -5,6 +5,8 @@ import { Incident, IncidentStatus, IncidentSeverity } from './entity/incident.en
 import { CreateIncidentDto, UpdateIncidentDto } from './dto/incident.dto';
 import { EventsGateway } from '../websockets/events.gateway';
 import { UserType } from '../common/enums/user-type.enum';
+import { UsersService } from '../users/users.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class IncidentsService {
@@ -12,6 +14,8 @@ export class IncidentsService {
     @InjectRepository(Incident)
     private incidentsRepository: Repository<Incident>,
     private eventsGateway: EventsGateway,
+    private usersService: UsersService,
+    private emailService: EmailService,
   ) {}
 
   async create(createIncidentDto: CreateIncidentDto, ciudadanoId: number): Promise<Incident> {
@@ -113,9 +117,13 @@ export class IncidentsService {
     // ENTIDAD: Puede cambiar el estado de cualquier incidente para gestionarlo
     // No puede cambiar otros campos que no sean el estado
     if (userType === UserType.ENTIDAD) {
-      // Las entidades pueden cambiar el estado de cualquier incidente
-      if (Object.keys(updateIncidentDto).length > 1 || 
-          (Object.keys(updateIncidentDto).length === 1 && !updateIncidentDto.estado)) {
+      // Filtrar solo las propiedades que tienen valor (no undefined)
+      const definedKeys = Object.keys(updateIncidentDto).filter(
+        key => updateIncidentDto[key as keyof UpdateIncidentDto] !== undefined
+      );
+      
+      // Las entidades solo pueden enviar el campo 'estado'
+      if (definedKeys.length !== 1 || definedKeys[0] !== 'estado') {
         throw new ForbiddenException('Las entidades solo pueden cambiar el estado del incidente');
       }
     }
@@ -133,6 +141,47 @@ export class IncidentsService {
         newStatus: updateIncidentDto.estado,
         updatedBy: userId,
       });
+
+      // � Enviar email al ciudadano informando del cambio de estado
+      try {
+        const ciudadano = incident.ciudadano;
+        if (ciudadano) {
+          await this.emailService.sendIncidentStatusChangeEmail(
+            ciudadano.email,
+            `${ciudadano.nombre} ${ciudadano.apellidos}`,
+            id,
+            oldStatus,
+            updateIncidentDto.estado,
+            incident.descripcion,
+          );
+        }
+      } catch (error) {
+        console.error(`Error enviando email de cambio de estado:`, error);
+      }
+
+      // INCREMENTAR STRIKES SI SE MARCA COMO CANCELADO (Incidente Falso)
+      if (updateIncidentDto.estado === IncidentStatus.CANCELADO) {
+        try {
+          // Incrementar strikes del ciudadano que reportó el incidente (envía email automáticamente)
+          const ciudadanoActualizado = await this.usersService.incrementStrikes(incident.ciudadano_id, id);
+          
+          // Log para auditoría
+          console.log(
+            `Strike incrementado - Ciudadano ID: ${incident.ciudadano_id}, ` +
+            `Strikes totales: ${ciudadanoActualizado.strikes}, ` +
+            `Incidente ID: ${id}, ` +
+            `Marcado por: ${userId} (${userType})`
+          );
+
+          // Si alcanzó 3 strikes, la cuenta se deshabilitó automáticamente
+          if (ciudadanoActualizado.strikes >= 3 && !ciudadanoActualizado.activo) {
+            console.log(`Cuenta deshabilitada - Ciudadano ID: ${incident.ciudadano_id} (3 strikes)`);
+          }
+        } catch (error) {
+          // Log del error pero no detener el flujo
+          console.error(`Error al incrementar strikes para ciudadano ${incident.ciudadano_id}:`, error);
+        }
+      }
     }
 
     return updatedIncident;

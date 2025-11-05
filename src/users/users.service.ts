@@ -89,8 +89,8 @@ export class UsersService {
   /**
    * Incrementar strikes de un ciudadano
    */
-  async incrementStrikes(ciudadanoId: number): Promise<Ciudadano> {
-    return this.unifiedAuthService.incrementStrikes(ciudadanoId);
+  async incrementStrikes(ciudadanoId: number, incidentId?: number): Promise<Ciudadano> {
+    return this.unifiedAuthService.incrementStrikes(ciudadanoId, incidentId);
   }
 
   /**

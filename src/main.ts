@@ -24,8 +24,8 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port);
   
-  console.log(`🚀 Lazarus API está ejecutándose en http://localhost:${port}`);
-  console.log(`📊 Documentación disponible en http://localhost:${port}`);
-  console.log(`🔌 WebSocket disponible en ws://localhost:${port}`);
+  console.log(`Lazarus API está ejecutándose en http://localhost:${port}`);
+  console.log(`Documentación disponible en http://localhost:${port}`);
+  console.log(`WebSocket disponible en ws://localhost:${port}`);
 }
 bootstrap();

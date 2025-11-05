@@ -1,13 +1,16 @@
-import { Injectable, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { Ciudadano } from '../entity/ciudadano.entity';
 import { EntidadPublica } from '../entity/entidad-publica.entity';
 import { Administrador } from '../entity/administrador.entity';
-import { LoginDto, RegisterCiudadanoDto, RegisterEntidadDto, RegisterAdminDto } from '../dto/user-roles.dto';
+import { PasswordResetToken } from '../entity/password-reset-token.entity';
+import { LoginDto, RegisterCiudadanoDto, RegisterEntidadDto, RegisterAdminDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/user-roles.dto';
 import { UserType } from '../../common/enums/user-type.enum';
+import { EmailService } from '../../email/email.service';
 
 @Injectable()
 export class UnifiedAuthService {
@@ -18,8 +21,55 @@ export class UnifiedAuthService {
     private entidadRepository: Repository<EntidadPublica>,
     @InjectRepository(Administrador)
     private adminRepository: Repository<Administrador>,
+    @InjectRepository(PasswordResetToken)
+    private passwordResetTokenRepository: Repository<PasswordResetToken>,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
+
+  /**
+   * Verifica si un email ya existe en cualquiera de las 3 tablas
+   * @returns true si el email existe, false si no existe
+   */
+  async emailExists(email: string): Promise<boolean> {
+    const existsInCiudadanos = await this.ciudadanoRepository.findOne({
+      where: { email },
+    });
+    
+    if (existsInCiudadanos) return true;
+
+    const existsInEntidades = await this.entidadRepository.findOne({
+      where: { email },
+    });
+    
+    if (existsInEntidades) return true;
+
+    const existsInAdmins = await this.adminRepository.findOne({
+      where: { email },
+    });
+    
+    return !!existsInAdmins;
+  }
+
+  /**
+   * Verifica si un email está disponible para registro (endpoint público)
+   * @returns { available: boolean, message: string }
+   */
+  async checkEmailAvailability(email: string): Promise<{ available: boolean; message: string }> {
+    const exists = await this.emailExists(email);
+    
+    if (exists) {
+      return {
+        available: false,
+        message: 'El email ya está registrado en el sistema',
+      };
+    }
+
+    return {
+      available: true,
+      message: 'El email está disponible',
+    };
+  }
 
   async validateUser(email: string, contraseña: string): Promise<any> {
     // Buscar en todas las tablas
@@ -100,17 +150,8 @@ export class UnifiedAuthService {
 
   async registerCiudadano(registerDto: RegisterCiudadanoDto) {
     // Verificar si el email ya existe en cualquier tabla
-    const existsInCiudadanos = await this.ciudadanoRepository.findOne({
-      where: { email: registerDto.email },
-    });
-    const existsInEntidades = await this.entidadRepository.findOne({
-      where: { email: registerDto.email },
-    });
-    const existsInAdmins = await this.adminRepository.findOne({
-      where: { email: registerDto.email },
-    });
-
-    if (existsInCiudadanos || existsInEntidades || existsInAdmins) {
+    const emailInUse = await this.emailExists(registerDto.email);
+    if (emailInUse) {
       throw new ConflictException('El email ya está registrado');
     }
 
@@ -133,6 +174,17 @@ export class UnifiedAuthService {
     });
 
     const savedCiudadano = await this.ciudadanoRepository.save(ciudadano);
+
+    // 📧 Enviar email de bienvenida
+    try {
+      await this.emailService.sendWelcomeEmail(
+        savedCiudadano.email,
+        `${savedCiudadano.nombre} ${savedCiudadano.apellidos}`,
+        UserType.CIUDADANO,
+      );
+    } catch (error) {
+      console.error('Error enviando email de bienvenida:', error);
+    }
 
     // Auto-login
     const payload = {
@@ -190,7 +242,7 @@ export class UnifiedAuthService {
     return this.adminRepository.findOne({ where: { id_admin: id } });
   }
 
-  async incrementStrikes(ciudadanoId: number): Promise<Ciudadano> {
+  async incrementStrikes(ciudadanoId: number, incidentId?: number): Promise<Ciudadano> {
     const ciudadano = await this.findCiudadanoById(ciudadanoId);
     
     if (!ciudadano) {
@@ -204,29 +256,59 @@ export class UnifiedAuthService {
       ciudadano.activo = false;
     }
 
-    return this.ciudadanoRepository.save(ciudadano);
+    const updatedCiudadano = await this.ciudadanoRepository.save(ciudadano);
+
+    // 📧 Enviar email de strike
+    try {
+      await this.emailService.sendStrikeEmail(
+        updatedCiudadano.email,
+        `${updatedCiudadano.nombre} ${updatedCiudadano.apellidos}`,
+        updatedCiudadano.strikes,
+        incidentId || 0,
+      );
+    } catch (error) {
+      console.error('Error enviando email de strike:', error);
+    }
+
+    return updatedCiudadano;
   }
 
   /**
    * Buscar usuario por email en todas las tablas
    */
-  async findByEmail(email: string): Promise<{ user: any; userType: UserType } | null> {
+  async findByEmail(email: string): Promise<{ 
+    user: any; 
+    userType: UserType;
+    repository: Repository<any>;
+  } | null> {
     // Buscar en ciudadanos
     const ciudadano = await this.ciudadanoRepository.findOne({ where: { email } });
     if (ciudadano) {
-      return { user: ciudadano, userType: UserType.CIUDADANO };
+      return { 
+        user: ciudadano, 
+        userType: UserType.CIUDADANO,
+        repository: this.ciudadanoRepository,
+      };
     }
 
     // Buscar en entidades
     const entidad = await this.entidadRepository.findOne({ where: { email } });
     if (entidad) {
-      return { user: entidad, userType: UserType.ENTIDAD };
+      return { 
+        user: entidad, 
+        userType: UserType.ENTIDAD,
+        repository: this.entidadRepository,
+      };
     }
 
     // Buscar en administradores
     const admin = await this.adminRepository.findOne({ where: { email } });
     if (admin) {
-      return { user: admin, userType: UserType.ADMIN };
+      return { 
+        user: admin, 
+        userType: UserType.ADMIN,
+        repository: this.adminRepository,
+      };
     }
 
     return null;
@@ -298,17 +380,8 @@ export class UnifiedAuthService {
    */
   async registerEntidad(registerDto: RegisterEntidadDto) {
     // Verificar si el email ya existe en cualquier tabla
-    const existsInCiudadanos = await this.ciudadanoRepository.findOne({
-      where: { email: registerDto.email },
-    });
-    const existsInEntidades = await this.entidadRepository.findOne({
-      where: { email: registerDto.email },
-    });
-    const existsInAdmins = await this.adminRepository.findOne({
-      where: { email: registerDto.email },
-    });
-
-    if (existsInCiudadanos || existsInEntidades || existsInAdmins) {
+    const emailInUse = await this.emailExists(registerDto.email);
+    if (emailInUse) {
       throw new ConflictException('El email ya está registrado');
     }
 
@@ -322,6 +395,17 @@ export class UnifiedAuthService {
     });
 
     const savedEntidad = await this.entidadRepository.save(entidad);
+
+    // 📧 Enviar email de bienvenida
+    try {
+      await this.emailService.sendWelcomeEmail(
+        savedEntidad.email,
+        savedEntidad.nombre_entidad,
+        UserType.ENTIDAD,
+      );
+    } catch (error) {
+      console.error('Error enviando email de bienvenida:', error);
+    }
 
     // Auto-login
     const payload = {
@@ -347,17 +431,8 @@ export class UnifiedAuthService {
    */
   async registerAdmin(registerDto: RegisterAdminDto) {
     // Verificar si el email ya existe en cualquier tabla
-    const existsInCiudadanos = await this.ciudadanoRepository.findOne({
-      where: { email: registerDto.email },
-    });
-    const existsInEntidades = await this.entidadRepository.findOne({
-      where: { email: registerDto.email },
-    });
-    const existsInAdmins = await this.adminRepository.findOne({
-      where: { email: registerDto.email },
-    });
-
-    if (existsInCiudadanos || existsInEntidades || existsInAdmins) {
+    const emailInUse = await this.emailExists(registerDto.email);
+    if (emailInUse) {
       throw new ConflictException('El email ya está registrado');
     }
 
@@ -371,6 +446,17 @@ export class UnifiedAuthService {
     });
 
     const savedAdmin = await this.adminRepository.save(admin);
+
+    // 📧 Enviar email de bienvenida
+    try {
+      await this.emailService.sendWelcomeEmail(
+        savedAdmin.email,
+        `${savedAdmin.nombre} ${savedAdmin.apellidos}`,
+        UserType.ADMIN,
+      );
+    } catch (error) {
+      console.error('Error enviando email de bienvenida:', error);
+    }
 
     // Auto-login
     const payload = {
@@ -389,5 +475,298 @@ export class UnifiedAuthService {
         ...result,
       },
     };
+  }
+
+  /**
+   * Forgot Password - Generar token y enviar email
+   */
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ success: boolean; message: string }> {
+    const { email } = forgotPasswordDto;
+
+    console.log(`Solicitud de reset de contraseña para: ${email}`);
+
+    // Buscar usuario en todas las tablas
+    const userInfo = await this.findByEmail(email);
+
+    if (!userInfo) {
+      console.log(`Email no encontrado: ${email}`);
+      return { 
+        success: false,
+        message: 'No se encontró ninguna cuenta asociada a este correo electrónico. Por favor, verifica que el email sea correcto o regístrate si aún no tienes una cuenta.' 
+      };
+    }
+
+    const { user, userType } = userInfo;
+
+    // Generar token único
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // Expiración: 1 hora
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1);
+
+    // Guardar token en la base de datos
+    const resetToken = this.passwordResetTokenRepository.create({
+      email,
+      token,
+      user_type: userType,
+      expires_at: expiresAt,
+    });
+
+    await this.passwordResetTokenRepository.save(resetToken);
+
+    // Enviar email con el token
+    try {
+      const nombre = userType === UserType.ENTIDAD 
+        ? user.nombre_entidad 
+        : `${user.nombre} ${user.apellidos || ''}`.trim();
+
+      await this.emailService.sendPasswordResetEmail(email, nombre, token);
+      
+      console.log(`Token de reset generado y enviado a ${email} (${userType})`);
+    } catch (error) {
+      console.error('Error enviando email de reset:', error);
+      throw new BadRequestException('Error al enviar el correo de recuperación. Por favor, intenta nuevamente.');
+    }
+
+    return { 
+      success: true,
+      message: 'Se han enviado las instrucciones de recuperación a tu correo electrónico. Por favor, revisa tu bandeja de entrada y sigue los pasos para restablecer tu contraseña. El enlace expirará en 1 hora.' 
+    };
+  }
+
+  /**
+   * 🔑 Reset Password - Validar token y cambiar contraseña
+   */
+  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
+    const { token, newPassword } = resetPasswordDto;
+
+    // Buscar token válido
+    const resetToken = await this.passwordResetTokenRepository.findOne({
+      where: {
+        token,
+        used: false,
+        expires_at: MoreThan(new Date()),
+      },
+    });
+
+    if (!resetToken) {
+      throw new BadRequestException('Token inválido o expirado');
+    }
+
+    // Buscar usuario según el tipo
+    let user: any = null;
+    let repository: Repository<any> | null = null;
+
+    switch (resetToken.user_type) {
+      case UserType.CIUDADANO:
+        user = await this.ciudadanoRepository.findOne({ where: { email: resetToken.email } });
+        repository = this.ciudadanoRepository;
+        break;
+      case UserType.ENTIDAD:
+        user = await this.entidadRepository.findOne({ where: { email: resetToken.email } });
+        repository = this.entidadRepository;
+        break;
+      case UserType.ADMIN:
+        user = await this.adminRepository.findOne({ where: { email: resetToken.email } });
+        repository = this.adminRepository;
+        break;
+    }
+
+    if (!user || !repository) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    // Hash de la nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar contraseña
+    user.contraseña = hashedPassword;
+    await repository.save(user);
+
+    // Marcar token como usado
+    resetToken.used = true;
+    await this.passwordResetTokenRepository.save(resetToken);
+
+    console.log(`Contraseña actualizada para ${resetToken.email} (${resetToken.user_type})`);
+
+    return { message: 'Contraseña actualizada exitosamente' };
+  }
+
+  /**
+   * Obtiene el perfil completo del usuario autenticado
+   */
+  async getProfile(userId: number, userType: UserType): Promise<any> {
+    let user: any = null;
+
+    switch (userType) {
+      case UserType.CIUDADANO:
+        user = await this.ciudadanoRepository.findOne({
+          where: { id_ciudadano: userId },
+        });
+        if (user) {
+          return {
+            id: user.id_ciudadano,
+            nombre: user.nombre,
+            apellidos: user.apellidos,
+            email: user.email,
+            cedula: user.cedula,
+            telefono: user.telefono,
+            provincia: user.provincia,
+            canton: user.canton,
+            distrito: user.distrito,
+            direccion: user.direccion,
+            userType: 'ciudadano',
+            activo: user.activo,
+            strikes: user.strikes,
+            fecha_creacion: user.fecha_creacion,
+            fecha_actualizacion: user.fecha_actualizacion,
+          };
+        }
+        break;
+
+      case UserType.ENTIDAD:
+        user = await this.entidadRepository.findOne({
+          where: { id_entidad: userId },
+        });
+        if (user) {
+          return {
+            id: user.id_entidad,
+            nombre_entidad: user.nombre_entidad,
+            tipo_entidad: user.tipo_entidad,
+            email: user.email,
+            telefono_emergencia: user.telefono_emergencia,
+            provincia: user.provincia,
+            canton: user.canton,
+            distrito: user.distrito,
+            ubicacion: user.ubicacion,
+            userType: 'entidad_publica',
+            activo: user.activo,
+            fecha_creacion: user.fecha_creacion,
+            fecha_actualizacion: user.fecha_actualizacion,
+          };
+        }
+        break;
+
+      case UserType.ADMIN:
+        user = await this.adminRepository.findOne({
+          where: { id_admin: userId },
+        });
+        if (user) {
+          return {
+            id: user.id_admin,
+            nombre: user.nombre,
+            apellidos: user.apellidos,
+            email: user.email,
+            provincia: user.provincia,
+            canton: user.canton,
+            distrito: user.distrito,
+            nivel_acceso: user.nivel_acceso,
+            userType: 'administrador',
+            activo: user.activo,
+            fecha_creacion: user.fecha_creacion,
+            fecha_actualizacion: user.fecha_actualizacion,
+          };
+        }
+        break;
+    }
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    return user;
+  }
+
+  /**
+   * Actualiza el perfil del usuario autenticado
+   */
+  async updateProfile(userId: number, userType: UserType, updateData: any): Promise<any> {
+    let user: any = null;
+    let repository: any = null;
+
+    switch (userType) {
+      case UserType.CIUDADANO:
+        repository = this.ciudadanoRepository;
+        user = await repository.findOne({
+          where: { id_ciudadano: userId },
+        });
+        
+        if (user) {
+          // Solo permitir actualizar campos específicos de ciudadano
+          const allowedFields = ['nombre', 'apellidos', 'telefono', 'provincia', 'canton', 'distrito', 'direccion'];
+          const filteredData = Object.keys(updateData)
+            .filter(key => allowedFields.includes(key) && updateData[key] !== undefined)
+            .reduce((obj, key) => {
+              obj[key] = updateData[key];
+              return obj;
+            }, {} as Record<string, any>);
+
+          if (Object.keys(filteredData).length === 0) {
+            throw new BadRequestException('No hay campos válidos para actualizar');
+          }
+
+          await repository.update({ id_ciudadano: userId }, filteredData);
+          console.log(`Perfil actualizado - Ciudadano ID: ${userId}`);
+        }
+        break;
+
+      case UserType.ENTIDAD:
+        repository = this.entidadRepository;
+        user = await repository.findOne({
+          where: { id_entidad: userId },
+        });
+        
+        if (user) {
+          // Solo permitir actualizar campos específicos de entidad
+          const allowedFields = ['nombre_entidad', 'telefono_emergencia', 'provincia', 'canton', 'distrito', 'ubicacion'];
+          const filteredData = Object.keys(updateData)
+            .filter(key => allowedFields.includes(key) && updateData[key] !== undefined)
+            .reduce((obj, key) => {
+              obj[key] = updateData[key];
+              return obj;
+            }, {} as Record<string, any>);
+
+          if (Object.keys(filteredData).length === 0) {
+            throw new BadRequestException('No hay campos válidos para actualizar');
+          }
+
+          await repository.update({ id_entidad: userId }, filteredData);
+          console.log(`Perfil actualizado - Entidad ID: ${userId}`);
+        }
+        break;
+
+      case UserType.ADMIN:
+        repository = this.adminRepository;
+        user = await repository.findOne({
+          where: { id_admin: userId },
+        });
+        
+        if (user) {
+          // Solo permitir actualizar campos específicos de administrador
+          const allowedFields = ['nombre', 'apellidos', 'provincia', 'canton', 'distrito'];
+          const filteredData = Object.keys(updateData)
+            .filter(key => allowedFields.includes(key) && updateData[key] !== undefined)
+            .reduce((obj, key) => {
+              obj[key] = updateData[key];
+              return obj;
+            }, {} as Record<string, any>);
+
+          if (Object.keys(filteredData).length === 0) {
+            throw new BadRequestException('No hay campos válidos para actualizar');
+          }
+
+          await repository.update({ id_admin: userId }, filteredData);
+          console.log(`Perfil actualizado - Administrador ID: ${userId}`);
+        }
+        break;
+    }
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    // Obtener el perfil actualizado
+    return this.getProfile(userId, userType);
   }
 }

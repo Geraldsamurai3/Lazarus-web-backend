@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Actualización de Incidente</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f0f4fa;
+      font-family: system-ui, -apple-system, sans-serif;
+      color: #1f2d3d;
+    }
+    .badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      font-size: 13px;
+    }
+    .badge-PENDIENTE { background: #FF9800; }
+    .badge-EN_PROCESO { background: #2196F3; }
+    .badge-RESUELTO { background: #10b981; }
+    .badge-CANCELADO { background: #ef4444; }
+    .small {
+      font-size: 12px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="#f0f4fa">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px;">
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+                <tr>
+                  <td style="background: linear-gradient(90deg, #2196F3, #1976D2); height: 6px; font-size: 0;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td style="padding: 32px;">
+                    <h1 style="margin: 0 0 12px; font-size: 24px; color: #1f2d3d;">� Actualización de Incidente</h1>
+                    <p style="margin: 0 0 20px; font-size: 14px; color: #6b7280;">Incidente #{{incidentId}}</p>
+                    
+                    <p style="margin: 0 0 12px;">Hola {{nombre}},</p>
+                    
+                    <p style="margin: 0 0 20px;">El estado de tu incidente reportado ha sido actualizado por las autoridades:</p>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8f9fa; border-left: 4px solid #2196F3; border-radius: 8px; margin: 20px 0;">
+                      <tr>
+                        <td style="padding: 20px;">
+                          <p style="margin: 0 0 8px;"><strong>📋 Incidente #{{incidentId}}</strong></p>
+                          <p style="margin: 0 0 16px; color: #6b7280; font-size: 14px;">{{descripcion}}</p>
+                          
+                          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">
+                          
+                          <p style="margin: 0 0 8px; font-size: 14px;"><strong>Estado anterior:</strong></p>
+                          <p style="margin: 0 0 16px;"><span class="badge badge-{{oldStatus}}">{{oldStatusLabel}}</span></p>
+                          
+                          <p style="margin: 0 0 8px; font-size: 14px;"><strong>Estado actual:</strong></p>
+                          <p style="margin: 0;"><span class="badge badge-{{newStatus}}">{{newStatusLabel}}</span></p>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    {{#if statusMessage}}
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f0f7ff; border-left: 4px solid #4f46e5; border-radius: 8px; margin: 20px 0;">
+                      <tr>
+                        <td style="padding: 16px;">
+                          <p style="margin: 0; font-size: 14px;">{{{statusMessage}}}</p>
+                        </td>
+                      </tr>
+                    </table>
+                    {{/if}}
+                    
+                    <hr style="border: none; border-top: 1px solid #e6eaf2; margin: 24px 0;">
+                    
+                    <p class="small" style="margin: 0;">
+                      Puedes ver más detalles del incidente en tu panel de usuario.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top: 24px;">
+              <p class="small" style="margin: 0;">© 2025 Lazarus - Sistema de Gestión de Emergencias</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advertencia de Strike</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f0f4fa;
+      font-family: system-ui, -apple-system, sans-serif;
+      color: #1f2d3d;
+    }
+    .badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      font-size: 13px;
+    }
+    .badge-warning { background: #FF9800; }
+    .badge-danger { background: #ef4444; }
+    .badge-critical { background: #991b1b; }
+    .strike-counter {
+      font-size: 36px;
+      font-weight: 700;
+      color: #ef4444;
+      margin: 16px 0;
+    }
+    .small {
+      font-size: 12px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="#f0f4fa">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px;">
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+                <tr>
+                  <td style="background: linear-gradient(90deg, #FF5722, #D32F2F); height: 6px; font-size: 0;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td style="padding: 32px;">
+                    <h1 style="margin: 0 0 12px; font-size: 24px; color: #1f2d3d;">{{headerIcon}} {{headerTitle}}</h1>
+                    
+                    <p style="margin: 0 0 20px;">Hola {{nombre}},</p>
+                    
+                    {{#if isDisabled}}
+                      <table width="100%" cellpadding="0" cellspacing="0" style="background: #991b1b; border-radius: 8px; margin: 20px 0;">
+                        <tr>
+                          <td align="center" style="padding: 24px; color: #ffffff;">
+                            <h3 style="margin: 0 0 16px; font-size: 20px;">❌ Tu cuenta ha sido deshabilitada permanentemente</h3>
+                            <div class="strike-counter" style="color: #ffffff;">{{currentStrikes}} / 3</div>
+                            <p style="margin: 0; font-size: 14px;"><strong>Has alcanzado el límite de 3 strikes por reportar incidentes falsos o spam.</strong></p>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <h3 style="margin: 24px 0 12px; font-size: 18px; color: #1f2d3d;">¿Por qué pasó esto?</h3>
+                      <p style="margin: 0 0 20px;">El incidente <strong>#{{incidentId}}</strong> fue marcado como <strong>FALSO o SPAM</strong> por las autoridades de emergencia.</p>
+                      
+                      <h3 style="margin: 24px 0 12px; font-size: 18px; color: #1f2d3d;">¿Qué puedo hacer?</h3>
+                      <p style="margin: 0 0 12px;">Si crees que esto es un error, por favor contacta a un administrador del sistema para revisar tu caso.</p>
+                      <p style="margin: 0;"><strong>⚠️ Solo un administrador puede reactivar tu cuenta.</strong></p>
+                    {{else}}
+                      <table width="100%" cellpadding="0" cellspacing="0" style="background: #fff3cd; border-left: 4px solid #FF9800; border-radius: 8px; margin: 20px 0;">
+                        <tr>
+                          <td style="padding: 20px;">
+                            <h3 style="margin: 0 0 12px; color: #FF9800;">⚠️ Has recibido un strike</h3>
+                            <div class="strike-counter">{{currentStrikes}} / 3</div>
+                            <p style="margin: 0;">El incidente <strong>#{{incidentId}}</strong> fue marcado como <strong>FALSO o SPAM</strong>.</p>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <h3 style="margin: 24px 0 12px; font-size: 18px; color: #1f2d3d;">¿Qué significa esto?</h3>
+                      <p style="margin: 0 0 20px;">Los strikes son advertencias por reportar incidentes falsos, spam, o información incorrecta que dificulta el trabajo de las entidades de emergencia.</p>
+                      
+                      <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8f9fa; border-radius: 8px; margin: 20px 0;">
+                        <tr>
+                          <td style="padding: 20px;">
+                            <h3 style="margin: 0 0 12px; font-size: 16px;">Sistema de Strikes:</h3>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin: 0;">
+                              <tr>
+                                <td style="padding: 10px; margin: 5px 0; border-left: 4px solid {{#ifEquals currentStrikes 1}}#F44336{{else}}#ddd{{/ifEquals}}; background: {{#ifEquals currentStrikes 1}}#ffebee{{else}}#ffffff{{/ifEquals}};">
+                                  <strong>🟡 1 Strike:</strong> Advertencia - Puedes seguir usando el sistema normalmente
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 10px; margin: 5px 0; border-left: 4px solid {{#ifEquals currentStrikes 2}}#F44336{{else}}#ddd{{/ifEquals}}; background: {{#ifEquals currentStrikes 2}}#ffebee{{else}}#ffffff{{/ifEquals}};">
+                                  <strong>🟠 2 Strikes:</strong> Última advertencia - Ten mucho cuidado con tus reportes
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 10px; margin: 5px 0; border-left: 4px solid #ddd; background: #ffffff;">
+                                  <strong>🔴 3 Strikes:</strong> Tu cuenta será deshabilitada permanentemente
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <table width="100%" cellpadding="0" cellspacing="0" style="background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 8px; margin: 20px 0;">
+                        <tr>
+                          <td style="padding: 15px;">
+                            <p style="margin: 0;"><strong>📊 Strikes actuales: {{currentStrikes}} de 3</strong></p>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="margin: 24px 0 12px;"><strong>⚠️ Por favor, asegúrate de reportar solo emergencias REALES y VERIFICABLES.</strong></p>
+                      <p style="margin: 0; color: #6b7280; font-size: 14px;">Cada reporte falso pone en riesgo la capacidad de respuesta del sistema ante emergencias reales.</p>
+                    {{/if}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top: 24px;">
+              <p class="small" style="margin: 0;">© 2025 Lazarus - Sistema de Gestión de Emergencias</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
