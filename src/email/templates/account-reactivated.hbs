@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuenta Reactivada</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f0f4fa;
+      font-family: system-ui, -apple-system, sans-serif;
+      color: #1f2d3d;
+    }
+    .badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      font-size: 13px;
+    }
+    .badge-warning { background: #FF9800; }
+    .small {
+      font-size: 12px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="#f0f4fa">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px;">
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+                <tr>
+                  <td style="background: linear-gradient(90deg, #10b981, #059669); height: 6px; font-size: 0;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td style="padding: 32px;">
+                    <h1 style="margin: 0 0 12px; font-size: 24px; color: #1f2d3d;">✅ Cuenta Reactivada</h1>
+                    
+                    <p style="margin: 0 0 12px;">Hola {{nombre}},</p>
+                    
+                    <p style="margin: 0 0 20px;">
+                      <strong>Tu queja ha sido procesada con éxito.</strong> Después de revisar tu caso, un administrador ha decidido reactivar tu cuenta.
+                    </p>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #d1fae5; border-left: 4px solid #10b981; border-radius: 8px; margin: 20px 0;">
+                      <tr>
+                        <td style="padding: 20px;">
+                          <p style="margin: 0 0 12px;"><strong>✅ Tu cuenta ha sido reactivada</strong></p>
+                          <p style="margin: 0; font-size: 14px;">Ya puedes volver a acceder al sistema y reportar incidentes.</p>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #fff3cd; border-left: 4px solid #FF9800; border-radius: 8px; margin: 20px 0;">
+                      <tr>
+                        <td style="padding: 20px;">
+                          <p style="margin: 0 0 12px;"><span class="badge badge-warning">⚠️ Strikes actuales: {{currentStrikes}}/3</span></p>
+                          <p style="margin: 0; font-size: 14px; font-weight: 600; color: #b45309;">
+                            Sin embargo, aún conservas {{currentStrikes}} strikes. Esta es tu ÚLTIMA OPORTUNIDAD.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <h3 style="margin: 24px 0 12px; font-size: 18px; color: #1f2d3d;">⚠️ Advertencia Importante</h3>
+                    <p style="margin: 0 0 12px;">
+                      Tu cuenta fue deshabilitada por acumular 3 strikes debido a reportes falsos o spam. 
+                      Ahora tienes <strong>{{currentStrikes}} strikes</strong>, lo que significa que:
+                    </p>
+                    
+                    <ul style="margin: 12px 0 20px 20px; padding: 0; font-size: 14px;">
+                      <li style="margin-bottom: 8px;"><strong>🔴 Un strike más deshabilitará permanentemente tu cuenta</strong></li>
+                      <li style="margin-bottom: 8px;">No habrá más oportunidades de apelación</li>
+                      <li>Debes reportar SOLO emergencias reales y verificables</li>
+                    </ul>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 8px; margin: 20px 0;">
+                      <tr>
+                        <td style="padding: 16px;">
+                          <p style="margin: 0 0 8px; font-weight: 600; color: #991b1b;">🚫 NO reportes:</p>
+                          <ul style="margin: 8px 0 0 20px; padding: 0; font-size: 14px; color: #991b1b;">
+                            <li>Incidentes falsos o inventados</li>
+                            <li>Información exagerada o incorrecta</li>
+                            <li>Spam o reportes sin fundamento</li>
+                            <li>Situaciones que no son emergencias reales</li>
+                          </ul>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 8px; margin: 20px 0;">
+                      <tr>
+                        <td style="padding: 16px;">
+                          <p style="margin: 0 0 8px; font-weight: 600; color: #075985;">✅ SÍ reporta:</p>
+                          <ul style="margin: 8px 0 0 20px; padding: 0; font-size: 14px; color: #075985;">
+                            <li>Emergencias reales y verificables</li>
+                            <li>Información precisa y detallada</li>
+                            <li>Situaciones que requieren atención inmediata</li>
+                            <li>Ubicaciones exactas y descripciones claras</li>
+                          </ul>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <hr style="border: none; border-top: 1px solid #e6eaf2; margin: 24px 0;">
+                    
+                    <p style="margin: 0; font-size: 14px; color: #6b7280;">
+                      Recuerda: El sistema de gestión de emergencias existe para salvar vidas. 
+                      Usa el sistema de manera responsable y ayuda a mantener segura nuestra comunidad.
+                    </p>
+                    
+                    <p style="margin: 16px 0 0; font-size: 14px;">
+                      <strong>Gracias por tu comprensión y cooperación.</strong>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top: 24px;">
+              <p class="small" style="margin: 0;">© 2025 Lazarus - Sistema de Gestión de Emergencias</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

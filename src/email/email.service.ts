@@ -57,7 +57,13 @@ export class EmailService {
       return;
     }
 
-    const templateFiles = ['welcome.hbs', 'incident-status-change.hbs', 'strike.hbs', 'password-reset.hbs'];
+    const templateFiles = [
+      'welcome.hbs',
+      'incident-status-change.hbs',
+      'strike.hbs',
+      'password-reset.hbs',
+      'account-reactivated.hbs'
+    ];
 
     templateFiles.forEach(file => {
       try {
@@ -179,6 +185,38 @@ export class EmailService {
     const html = template({
       nombre,
       resetUrl,
+    });
+
+    return this.sendEmail(email, subject, html);
+  }
+
+  /**
+   * Email de cuenta reactivada (reducción de strikes de 3 a 2)
+   */
+  async sendAccountReactivatedEmail(
+    email: string,
+    nombre: string,
+    currentStrikes: number,
+  ) {
+    const subject = '✅ Tu cuenta ha sido reactivada - Última oportunidad';
+    
+    let template = this.templates.get('account-reactivated');
+    
+    // Si no está cargado, intentar cargarlo dinámicamente
+    if (!template) {
+      this.logger.warn('Template "account-reactivated" no encontrado en caché, intentando cargar...');
+      this.loadTemplates(); // Recargar todos los templates
+      template = this.templates.get('account-reactivated');
+      
+      if (!template) {
+        this.logger.error('Template "account-reactivated" no encontrado después de recargar');
+        return false;
+      }
+    }
+
+    const html = template({
+      nombre,
+      currentStrikes,
     });
 
     return this.sendEmail(email, subject, html);

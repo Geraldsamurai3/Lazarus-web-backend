@@ -353,6 +353,7 @@ export class UnifiedAuthService {
 
   /**
    * Deshabilitar/habilitar usuario
+   * Si el ciudadano tenía 3 strikes y se reactiva, se reduce a 2 strikes
    */
   async toggleUserStatus(id: number, userType: UserType): Promise<void> {
     const user = await this.findById(id, userType);
@@ -360,7 +361,28 @@ export class UnifiedAuthService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
+    const wasDisabled = !user.activo;
     user.activo = !user.activo;
+
+    // Si es ciudadano y se está HABILITANDO (activo pasa a true)
+    if (userType === UserType.CIUDADANO && wasDisabled && user.activo) {
+      // Si tenía 3 strikes, reducir a 2
+      if (user.strikes >= 3) {
+        user.strikes = 2;
+        
+        // Enviar email de reactivación con advertencia
+        try {
+          await this.emailService.sendAccountReactivatedEmail(
+            user.email,
+            `${user.nombre} ${user.apellidos}`,
+            user.strikes,
+          );
+          console.log(`Cuenta reactivada - Ciudadano ID: ${id}, Strikes reducidos a ${user.strikes}`);
+        } catch (error) {
+          console.error('Error enviando email de reactivación:', error);
+        }
+      }
+    }
 
     switch (userType) {
       case UserType.CIUDADANO:
