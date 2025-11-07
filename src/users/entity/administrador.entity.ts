@@ -1,4 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 export enum NivelAcceso {
   SUPER_ADMIN = 'SUPER_ADMIN',
@@ -17,9 +18,11 @@ export class Administrador {
   @Column()
   apellidos: string;
 
+  @Exclude() // ← Ocultar email
   @Column({ unique: true })
   email: string;
 
+  @Exclude() // ← Ocultar contraseña
   @Column()
   contraseña: string;
 
@@ -39,9 +42,11 @@ export class Administrador {
   @Column()
   distrito: string;
 
+  @Exclude() // ← Ocultar estado
   @Column({ default: true })
   activo: boolean;
 
+  @Exclude() // ← Ocultar fecha de creación
   @CreateDateColumn()
   fecha_creacion: Date;
 }

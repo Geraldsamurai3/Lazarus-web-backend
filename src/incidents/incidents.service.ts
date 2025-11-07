@@ -7,6 +7,7 @@ import { EventsGateway } from '../websockets/events.gateway';
 import { UserType } from '../common/enums/user-type.enum';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
+import { IncidentMediaService } from '../incident-media/incident-media.service';
 
 @Injectable()
 export class IncidentsService {
@@ -16,20 +17,37 @@ export class IncidentsService {
     private eventsGateway: EventsGateway,
     private usersService: UsersService,
     private emailService: EmailService,
+    private incidentMediaService: IncidentMediaService,
   ) {}
 
-  async create(createIncidentDto: CreateIncidentDto, ciudadanoId: number): Promise<Incident> {
+  async create(
+    createIncidentDto: CreateIncidentDto,
+    ciudadanoId: number,
+    files?: Express.Multer.File[],
+  ): Promise<Incident> {
+    // 1. Crear el incidente en la base de datos
     const incident = this.incidentsRepository.create({
       ...createIncidentDto,
       ciudadano_id: ciudadanoId,
     });
 
     const savedIncident = await this.incidentsRepository.save(incident);
-    
-    // Load full incident with relations
+
+    // 2. Si hay archivos, subirlos a Cloudinary y guardar las URLs en la BD
+    if (files && files.length > 0) {
+      try {
+        await this.incidentMediaService.uploadMedia(savedIncident.id, files);
+        console.log(`✅ ${files.length} archivo(s) subido(s) para incidente ${savedIncident.id}`);
+      } catch (error) {
+        console.error('❌ Error al subir archivos a Cloudinary:', error);
+        // No fallar la creación del incidente si falla la subida de archivos
+      }
+    }
+
+    // 3. Cargar el incidente completo con relaciones
     const fullIncident = await this.findOne(savedIncident.id);
-    
-    // Emit WebSocket event for new incident
+
+    // 4. Emitir evento WebSocket para notificar del nuevo incidente
     this.eventsGateway.emitIncidentCreated({
       incident: {
         id: fullIncident.id,
@@ -59,7 +77,8 @@ export class IncidentsService {
   }): Promise<Incident[]> {
     const queryBuilder = this.incidentsRepository
       .createQueryBuilder('incident')
-      .leftJoinAndSelect('incident.ciudadano', 'ciudadano');
+      .leftJoinAndSelect('incident.ciudadano', 'ciudadano')
+      .leftJoinAndSelect('incident.media', 'media'); // ← Agregar media
 
     if (filters?.tipo) {
       queryBuilder.andWhere('incident.tipo = :tipo', { tipo: filters.tipo });
@@ -85,7 +104,7 @@ export class IncidentsService {
   async findOne(id: number): Promise<Incident> {
     const incident = await this.incidentsRepository.findOne({
       where: { id },
-      relations: ['ciudadano'],
+      relations: ['ciudadano', 'media'],
     });
 
     if (!incident) {
@@ -203,6 +222,7 @@ export class IncidentsService {
     return this.incidentsRepository
       .createQueryBuilder('incident')
       .leftJoinAndSelect('incident.ciudadano', 'ciudadano')
+      .leftJoinAndSelect('incident.media', 'media') // ← Agregar media
       .where(
         `(6371 * acos(cos(radians(:lat)) * cos(radians(incident.latitud)) * 
         cos(radians(incident.longitud) - radians(:lng)) + sin(radians(:lat)) * 

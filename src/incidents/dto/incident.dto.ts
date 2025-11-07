@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsNumber, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsEnum, IsNumber, IsOptional } from 'class-validator';
 import { IncidentType, IncidentSeverity, IncidentStatus } from '../entity/incident.entity';
 
 export class CreateIncidentDto {
@@ -19,11 +19,6 @@ export class CreateIncidentDto {
 
   @IsString()
   direccion: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  imagenes?: string[];
 }
 
 export class UpdateIncidentDto {

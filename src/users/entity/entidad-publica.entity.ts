@@ -1,4 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 export enum TipoEntidad {
   BOMBEROS = 'BOMBEROS',
@@ -24,9 +25,11 @@ export class EntidadPublica {
   })
   tipo_entidad: TipoEntidad;
 
+  @Exclude() // ← Ocultar email
   @Column({ unique: true })
   email: string;
 
+  @Exclude() // ← Ocultar contraseña
   @Column()
   contraseña: string;
 
@@ -45,9 +48,11 @@ export class EntidadPublica {
   @Column('text')
   ubicacion: string;
 
+  @Exclude() // ← Ocultar estado
   @Column({ default: true })
   activo: boolean;
 
+  @Exclude() // ← Ocultar fecha de registro
   @CreateDateColumn()
   fecha_registro: Date;
 }

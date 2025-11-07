@@ -1,5 +1,6 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { Ciudadano } from '../../users/entity/ciudadano.entity';
+import { IncidentMedia } from '../../incident-media/entity/incident-media.entity';
 
 export enum IncidentType {
   INCENDIO = 'INCENDIO',
@@ -67,8 +68,8 @@ export class Incident {
   })
   estado: IncidentStatus;
 
-  @Column('simple-array', { nullable: true })
-  imagenes: string[];
+  @OneToMany(() => IncidentMedia, media => media.incidente)
+  media: IncidentMedia[];
 
   @CreateDateColumn()
   fecha_creacion: Date;

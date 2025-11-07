@@ -6,6 +6,7 @@ import { Incident } from './entity/incident.entity';
 import { WebsocketsModule } from '../websockets/websockets.module';
 import { UsersModule } from '../users/users.module';
 import { EmailModule } from '../email/email.module';
+import { IncidentMediaModule } from '../incident-media/incident-media.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { EmailModule } from '../email/email.module';
     WebsocketsModule,
     UsersModule,
     EmailModule,
+    IncidentMediaModule,
   ],
   controllers: [IncidentsController],
   providers: [IncidentsService],

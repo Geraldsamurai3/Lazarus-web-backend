@@ -13,7 +13,12 @@ import {
   HttpStatus,
   ParseFloatPipe,
   UseGuards,
+  UseInterceptors,
+  UploadedFiles,
+  BadRequestException,
+  ClassSerializerInterceptor,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { IncidentsService } from './incidents.service';
 import { CreateIncidentDto, UpdateIncidentDto } from './dto/incident.dto';
 import { Incident } from './entity/incident.entity';
@@ -25,18 +30,51 @@ import { GetUser } from '../auth/decorators/get-user.decorator';
 
 @Controller('incidents')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@UseInterceptors(ClassSerializerInterceptor) // ← Aplicar serialización
 export class IncidentsController {
   constructor(private readonly incidentsService: IncidentsService) {}
 
-  // CIUDADANO: Crear incidentes
+  // CIUDADANO: Crear incidentes (con archivos multimedia opcionales)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles(UserType.CIUDADANO, UserType.ADMIN)
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB por archivo
+      },
+      fileFilter: (req, file, cb) => {
+        const allowedMimes = [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+          'video/mp4',
+          'video/mpeg',
+          'video/quicktime',
+          'video/webm',
+        ];
+
+        if (allowedMimes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(
+            new BadRequestException(
+              'Formato no válido. Solo se aceptan imágenes (JPEG, PNG, GIF, WebP) y videos (MP4, MPEG, MOV, WebM)',
+            ),
+            false,
+          );
+        }
+      },
+    }),
+  )
   async create(
     @Body(ValidationPipe) createIncidentDto: CreateIncidentDto,
     @GetUser('userId') userId: number,
+    @UploadedFiles() files?: Express.Multer.File[],
   ): Promise<Incident> {
-    return this.incidentsService.create(createIncidentDto, userId);
+    return this.incidentsService.create(createIncidentDto, userId, files);
   }
 
   // TODOS: Ver todos los incidentes (con filtros)
