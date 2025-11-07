@@ -78,6 +78,8 @@ export class IncidentsController {
   }
 
   // TODOS: Ver todos los incidentes (con filtros)
+  // Por defecto NO incluye archivados (para el mapa)
+  // Usar ?includeArchived=true para ver archivados (solo admin)
   @Get()
   @Roles(UserType.CIUDADANO, UserType.ENTIDAD, UserType.ADMIN)
   async findAll(
@@ -85,12 +87,14 @@ export class IncidentsController {
     @Query('severidad') severidad?: string,
     @Query('estado') estado?: string,
     @Query('ciudadanoId') ciudadanoId?: number,
+    @Query('includeArchived') includeArchived?: string,
   ): Promise<Incident[]> {
     return this.incidentsService.findAll({
       tipo,
       severidad,
       estado,
       ciudadanoId,
+      includeArchived: includeArchived === 'true',
     });
   }
 

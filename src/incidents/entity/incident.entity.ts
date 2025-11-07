@@ -23,6 +23,7 @@ export enum IncidentStatus {
   EN_PROCESO = 'EN_PROCESO',
   RESUELTO = 'RESUELTO',
   CANCELADO = 'CANCELADO',
+  ARCHIVADO = 'ARCHIVADO', // ← Nuevo estado
 }
 
 @Entity('incidentes')

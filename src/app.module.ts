@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -10,12 +11,14 @@ import { IncidentMediaModule } from './incident-media/incident-media.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { WebsocketsModule } from './websockets/websockets.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(), // ← Habilitar tareas programadas
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -36,7 +39,8 @@ import { WebsocketsModule } from './websockets/websockets.module';
     IncidentsModule, 
     IncidentMediaModule, 
     NotificationsModule, 
-    StatisticsModule
+    StatisticsModule,
+    TasksModule, // ← Importar módulo de tareas
   ],
   controllers: [AppController],
   providers: [AppService],

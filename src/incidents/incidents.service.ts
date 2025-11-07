@@ -74,11 +74,19 @@ export class IncidentsService {
     severidad?: string;
     estado?: string;
     ciudadanoId?: number;
+    includeArchived?: boolean; // ← Nuevo filtro
   }): Promise<Incident[]> {
     const queryBuilder = this.incidentsRepository
       .createQueryBuilder('incident')
       .leftJoinAndSelect('incident.ciudadano', 'ciudadano')
-      .leftJoinAndSelect('incident.media', 'media'); // ← Agregar media
+      .leftJoinAndSelect('incident.media', 'media');
+
+    // Por defecto, excluir incidentes archivados (para el mapa)
+    if (!filters?.includeArchived) {
+      queryBuilder.andWhere('incident.estado != :archivado', { 
+        archivado: IncidentStatus.ARCHIVADO 
+      });
+    }
 
     if (filters?.tipo) {
       queryBuilder.andWhere('incident.tipo = :tipo', { tipo: filters.tipo });
@@ -219,16 +227,20 @@ export class IncidentsService {
 
   async getIncidentsByLocation(lat: number, lng: number, radius: number = 5): Promise<Incident[]> {
     // Simple distance calculation (you might want to use a more sophisticated geo query)
+    // IMPORTANTE: Excluir incidentes archivados del mapa
     return this.incidentsRepository
       .createQueryBuilder('incident')
       .leftJoinAndSelect('incident.ciudadano', 'ciudadano')
-      .leftJoinAndSelect('incident.media', 'media') // ← Agregar media
+      .leftJoinAndSelect('incident.media', 'media')
       .where(
         `(6371 * acos(cos(radians(:lat)) * cos(radians(incident.latitud)) * 
         cos(radians(incident.longitud) - radians(:lng)) + sin(radians(:lat)) * 
         sin(radians(incident.latitud)))) <= :radius`,
         { lat, lng, radius }
       )
+      .andWhere('incident.estado != :archivado', { 
+        archivado: IncidentStatus.ARCHIVADO 
+      }) // ← Excluir archivados
       .orderBy('incident.fecha_creacion', 'DESC')
       .getMany();
   }
