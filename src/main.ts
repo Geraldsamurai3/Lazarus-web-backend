@@ -1,26 +1,17 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
   
-  // Enable CORS desde variables de entorno
-  const corsOrigins = configService.get<string>('CORS_ORIGINS');
-  const allowedOrigins = corsOrigins 
-    ? corsOrigins.split(',').map(origin => origin.trim())
-    : ['http://localhost:3000', 'http://localhost:3001'];
-
+  // Enable CORS for frontend integration
   app.enableCors({
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    origin: '*',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
-
-  console.log('✅ CORS habilitado para:', allowedOrigins);
-
   // Global validation pipe
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
